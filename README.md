@@ -2,21 +2,21 @@
 
 Projeto de TCC focado em apoio à decisão clínica na triagem hospitalar.
 
-## Funcionalidades
+## FEATURES
 
 - Classificação automática de risco (1 a 5)
 - Correção médica dos casos
 - Re-treinamento contínuo do modelo
 - Dashboard com evolução do modelo
 
-## Tecnologias
+## FRMEWORKS
 
 - FastAPI
 - Streamlit
 - XGBoost
 - MongoDB
 
-## Como rodar
+## GUIA PARA RODAR
 
 1. Instalar dependências:
 pip install -r requirements.txt
