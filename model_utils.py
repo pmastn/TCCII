@@ -110,7 +110,7 @@ def train_model(X, y):
         random_state=42
     )
 
-    # --- balanceamento de classes ---------------------------------------------
+    # balanceamento de classes 
     classes = np.unique(y_adjusted)
 
     weights = compute_class_weight(
