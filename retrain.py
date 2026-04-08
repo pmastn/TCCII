@@ -31,8 +31,7 @@ for r in registros:
     entrada.setdefault("NRS_pain", 0)
 
     # idade obrigatória no pipeline
-    entrada["Age"] = 30  # (depois você pode salvar idade real)
-
+    entrada["Age"] = 30 
     dados.append(entrada)
 
 # proteção
@@ -49,7 +48,6 @@ df_original = pd.read_csv("data.csv", delimiter=';', encoding='latin1')
 
 print(f"Dataset original: {len(df_original)}")
 
-# juntar tudo
 df_total = pd.concat([df_original, df_novo], ignore_index=True)
 
 print(f"Dataset final: {len(df_total)}")
