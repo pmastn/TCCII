@@ -165,13 +165,13 @@ def retrain():
 
         X, y = preprocess_and_feature_engineer("data_retrain.csv")
 
-        # 🧠 TREINA NOVO MODELO
+        # TREINA NOVO MODELO
         modelo = train_model(X, y)
 
-        # 🔄 ATUALIZA FEATURES
+        # ATUALIZA FEATURES
         features_modelo = joblib.load("features_modelo.pkl")
 
-        # 🔥 ESSA LINHA É A MAIS IMPORTANTE DE TODAS
+        # ESSA LINHA É A MAIS IMPORTANTE DE TODAS
         modelo_versao += 1
 
         print(f"Modelo atualizado! Nova versão: {modelo_versao}")
