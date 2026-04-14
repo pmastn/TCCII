@@ -21,7 +21,7 @@ collection = db["atendimentos"]
 modelo = joblib.load("modelo_xgboost.pkl")
 features_modelo = joblib.load("features_modelo.pkl")
 
-#
+
 # ROTA INICIAL
 
 @app.get("/")
@@ -43,7 +43,6 @@ def predict(dados: dict):
     dados_modelo = dados.copy()
     dados_modelo.pop("cpf", None)
 
-    # garantir campos obrigatórios
     dados_modelo.setdefault("Chief_complain_Grouped", "OUTROS")
 
     df = pd.DataFrame([dados_modelo])
@@ -66,13 +65,10 @@ def predict(dados: dict):
         "corrigido": False,
         "probabilidades": probabilidades.tolist(),
         "timestamp_predicao": datetime.utcnow(),
-        "modelo_versao": modelo_versao  
+        "modelo_versao": modelo_versao
     }
 
-    try:
-        collection.insert_one(registro)
-    except Exception as e:
-        print("Erro ao salvar no Mongo:", e)
+    collection.insert_one(registro)
 
     return {
         "classe_predita": int(classe),
@@ -81,19 +77,13 @@ def predict(dados: dict):
 
 
 
-# CORREÇÃO MÉDICA
+# CORREÇÃO
 
 @app.post("/corrigir")
 def corrigir(dados: dict):
 
     cpf = dados.get("cpf")
     classe_real = dados.get("classe_real")
-
-    if not cpf:
-        return {"erro": "CPF é obrigatório"}
-
-    if classe_real is None:
-        return {"erro": "classe_real é obrigatória"}
 
     registro = collection.find_one(
         {"cpf": cpf},
@@ -114,23 +104,25 @@ def corrigir(dados: dict):
         }
     )
 
-    return {"status": "correção salva com sucesso"}
+    return {"status": "ok"}
 
 
 
-# RETREINAMENTO
-
+# RETRAIN
 @app.post("/retrain")
 def retrain():
 
-    global modelo, features_modelo, modelo_versao  # 🔥 IMPORTANTE
+    global modelo, features_modelo, modelo_versao
 
     try:
         from model_utils import preprocess_and_feature_engineer, train_model
 
-        registros = collection.find({"corrigido": True})
+        registros = list(collection.find({
+            "corrigido": True,
+            "classe_real": {"$ne": None}
+        }))
 
-        dados = []
+        dados_novos = []
 
         for r in registros:
             entrada = dict(r["entrada"])
@@ -148,47 +140,48 @@ def retrain():
 
             entrada["Age"] = 30
 
-            dados.append(entrada)
+            dados_novos.append(entrada)
 
-        if len(dados) == 0:
-            return {"erro": "Nenhum dado corrigido para treinar"}
+        if len(dados_novos) == 0:
+            return {"erro": "Sem dados corrigidos"}
 
-        df_novo = pd.DataFrame(dados)
+        df_novo = pd.DataFrame(dados_novos)
 
         df_original = pd.read_csv("data.csv", delimiter=';', encoding='latin1')
 
-        df_total = pd.concat([df_original, df_novo], ignore_index=True)
+        # PESO SUAVE
+        total_novos = len(df_novo)
+        peso_novo = total_novos / (total_novos + 10)
 
-        print(f"Re-treinando com {len(df_total)} registros...")
+        df_original["peso"] = 1.0
+        df_novo["peso"] = peso_novo
+
+        df_total = pd.concat([df_original, df_novo], ignore_index=True)
 
         df_total.to_csv("data_retrain.csv", sep=";", index=False)
 
         X, y = preprocess_and_feature_engineer("data_retrain.csv")
 
-        # TREINA NOVO MODELO
-        modelo = train_model(X, y)
+        pesos = df_total["peso"].values
 
-        # ATUALIZA FEATURES
+        modelo = train_model(X, y, sample_weights=pesos)
+
         features_modelo = joblib.load("features_modelo.pkl")
 
-        # ESSA LINHA É A MAIS IMPORTANTE DE TODAS
         modelo_versao += 1
 
-        print(f"Modelo atualizado! Nova versão: {modelo_versao}")
-
         return {
-            "status": "modelo re-treinado com sucesso",
-            "nova_versao": modelo_versao
+            "status": "modelo atualizado",
+            "versao": modelo_versao,
+            "peso_novos": round(peso_novo, 3)
         }
 
     except Exception as e:
         return {"erro": str(e)}
-    
 
 
+
+# DADOS
 @app.get("/dados")
-def get_dados():
-
-    registros = list(collection.find({}, {"_id": 0}))
-
-    return registros
+def dados():
+    return list(collection.find({}, {"_id": 0}))
