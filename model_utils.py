@@ -1,10 +1,7 @@
 import pandas as pd
 import numpy as np
 from xgboost import XGBClassifier
-from sklearn.utils.class_weight import compute_class_weight
 import joblib
-
-# CONFIG
 
 TARGET_COLUMN = 'KTAS_expert'
 
@@ -19,25 +16,17 @@ CATEGORICAL_FEATURES = [
 LOW_FREQUENCY_THRESHOLD = 10
 
 
-# FUNÇÃO AUX
 def clean_and_convert_to_numeric(series):
     return pd.to_numeric(series.astype(str).str.replace(',', '.'), errors='coerce')
 
 
-# PRÉ-PROCESSAMENTO (FUNCIONA COM DF OU CSV) 
-def preprocess_and_feature_engineer(data):
+def preprocess_and_feature_engineer(file_path):
 
-    # aceita string (arquivo) OU DataFrame
-    if isinstance(data, str):
-        df = pd.read_csv(data, delimiter=';', encoding='latin1')
-    else:
-        df = data.copy()
+    df = pd.read_csv(file_path, delimiter=';', encoding='latin1')
 
-    # colunas iniciais
     all_columns_initial = [TARGET_COLUMN,'Age'] + VITAL_SIGNS_AND_NUMERIC + ['Sex','Chief_complain']
     df_model = df[all_columns_initial].copy()
 
-    # PROCESSAMENTO DE TEXTO
     df_model['Chief_complain'] = df_model['Chief_complain'].str.lower()
 
     complaint_mapping = {
@@ -58,7 +47,7 @@ def preprocess_and_feature_engineer(data):
 
     df_model.drop(columns=['Chief_complain'], inplace=True)
 
-    # NUMÉRICOS 
+    # numéricos
     df_model['Age'] = clean_and_convert_to_numeric(df_model['Age'])
 
     for col in VITAL_SIGNS_AND_NUMERIC:
@@ -69,7 +58,7 @@ def preprocess_and_feature_engineer(data):
     for col in VITAL_SIGNS_AND_NUMERIC:
         df_model[col].fillna(df_model[col].median(), inplace=True)
 
-    #IDADE EM GRUPOS
+    # idade categórica
     df_model['Age_Group'] = pd.cut(
         df_model['Age'],
         bins=[0,2,12,17,59,120],
@@ -80,7 +69,7 @@ def preprocess_and_feature_engineer(data):
 
     df_model.dropna(inplace=True)
 
-    # ONE HOT ENCODING 
+    # one-hot
     df_encoded = pd.get_dummies(
         df_model,
         columns=CATEGORICAL_FEATURES,
@@ -93,10 +82,9 @@ def preprocess_and_feature_engineer(data):
     return X, y
 
 
-# TREINAMENTO SIMPLES (USADO NA API)
-def train_model(X, y):
+def train_model(X, y, sample_weights=None):
 
-    y_adjusted = y - 1  # classes de 0 a 4
+    y_adjusted = y - 1
 
     model = XGBClassifier(
         objective='multi:softprob',
@@ -110,24 +98,8 @@ def train_model(X, y):
         random_state=42
     )
 
-    # balanceamento de classes 
-    classes = np.unique(y_adjusted)
-
-    weights = compute_class_weight(
-        class_weight='balanced',
-        classes=classes,
-        y=y_adjusted
-    )
-
-    class_weights = dict(zip(classes, weights))
-
-    sample_weights = np.array([
-        class_weights[label] for label in y_adjusted
-    ])
-
     model.fit(X, y_adjusted, sample_weight=sample_weights)
 
-    # salvar modelo e features
     joblib.dump(model, "modelo_xgboost.pkl")
     joblib.dump(X.columns.tolist(), "features_modelo.pkl")
 
