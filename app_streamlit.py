@@ -201,9 +201,9 @@ elif pagina == "Dashboard":
                     st.warning("Sem dados corrigidos ainda")
                 else:
 
-                 
+
                     # ACURÁCIA POR VERSÃO
-         
+
                     evolucao = []
 
                     versoes = sorted(df_corrigidos["modelo_versao"].unique())
@@ -226,6 +226,8 @@ elif pagina == "Dashboard":
                     st.subheader("Evolução da Acurácia")
                     st.line_chart(df_evolucao.set_index("versao"))
 
+                    # ERROS vs ACERTOS
+   
                     st.subheader("Evolução de Acertos vs Erros")
 
                     erros_acertos = []
@@ -246,9 +248,9 @@ elif pagina == "Dashboard":
 
                     st.bar_chart(df_erros.set_index("versao"))
 
-  
+
                     # MATRIZ DE CONFUSÃO SIMPLES
-        
+
                     st.subheader("Comparação Modelo vs Médico")
 
                     comparacao = pd.crosstab(
@@ -258,8 +260,9 @@ elif pagina == "Dashboard":
 
                     st.dataframe(comparacao)
 
-                    # FILTRO POR CASO ESPECÍFICO 
-    
+  
+                    # FILTRO POR CASO ESPECÍFICO (TOP PRA APRESENTAÇÃO)
+  
                     st.subheader("Análise por tipo de caso")
 
                     queixas = df_corrigidos["entrada"].apply(lambda x: x.get("Chief_complain_Grouped", "OUTROS"))
