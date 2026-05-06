@@ -1,5 +1,7 @@
 import streamlit as st 
 import requests
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 st.title("Sistema de Triagem Hospitalar com IA")
 
@@ -226,42 +228,47 @@ elif pagina == "Dashboard":
                     st.subheader("Evolução da Acurácia")
                     st.line_chart(df_evolucao.set_index("versao"))
 
-                    # ERROS vs ACERTOS
-   
-                    st.subheader("Evolução de Acertos vs Erros")
 
-                    erros_acertos = []
+                    # MATRIZ DE CONFUSÃO 
 
-                    for v in versoes:
-                        df_v = df_corrigidos[df_corrigidos["modelo_versao"] == v]
+                    st.subheader("Matriz de Confusão - Modelo vs Médico")
 
-                        acertos = (df_v["classe_predita"] == df_v["classe_real"]).sum()
-                        erros = len(df_v) - acertos
-
-                        erros_acertos.append({
-                            "versao": v,
-                            "acertos": acertos,
-                            "erros": erros
-                        })
-
-                    df_erros = pd.DataFrame(erros_acertos)
-
-                    st.bar_chart(df_erros.set_index("versao"))
-
-
-                    # MATRIZ DE CONFUSÃO SIMPLES
-
-                    st.subheader("Comparação Modelo vs Médico")
-
-                    comparacao = pd.crosstab(
-                        df_corrigidos["classe_predita"],
-                        df_corrigidos["classe_real"]
+    
+                    matriz = pd.crosstab(
+                        df_corrigidos["classe_real"],
+                        df_corrigidos["classe_predita"]
                     )
 
-                    st.dataframe(comparacao)
+
+                    matriz.index = matriz.index.astype(int)
+                    matriz.columns = matriz.columns.astype(int)
+
+                    import seaborn as sns
+                    import matplotlib.pyplot as plt
+
+                    fig, ax = plt.subplots()
+
+                    sns.heatmap(
+                        matriz,
+                        annot=True,
+                        fmt="d",
+                        cmap="Blues",
+                        linewidths=0.5,
+                        linecolor='gray',
+                        cbar=True,
+                        annot_kws={"size": 12},
+                        ax=ax
+                    )
+
+                    ax.set_xlabel("Classe Predita (Modelo)")
+                    ax.set_ylabel("Classe Real (Médico)")
+                    ax.set_title("Matriz de Confusão - Classificação Modelo vs Avaliação Médica", fontsize=12)
+
+                    st.pyplot(fig)
+
 
   
-                    # FILTRO POR CASO ESPECÍFICO (TOP PRA APRESENTAÇÃO)
+                    # FILTRO POR CASO ESPECÍFICO 
   
                     st.subheader("Análise por tipo de caso")
 
