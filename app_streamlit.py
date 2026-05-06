@@ -158,7 +158,7 @@ elif pagina == "Admin":
 
     if st.button("Re-treinar modelo"):
 
-        with st.spinner("Re-treinando modelo... ⏳"):
+        with st.spinner("Re-treinando modelo... "):
 
             try:
                 resposta = requests.post("http://127.0.0.1:8000/retrain")
