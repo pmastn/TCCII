@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import seaborn as sns
 import matplotlib.pyplot as plt
+from model_utils import TODOS_SINTOMAS
 
 st.title("Sistema de Triagem Hospitalar com IA")
 
@@ -24,29 +25,24 @@ if pagina == "Triagem":
         ["Bebe", "Crianca", "Adolescente", "Adulto", "Idoso"]
     )
 
-    queixas_modelo = [
-    "OUTROS",
-    "abdo pain",
-    "dyspnea",
-    "dizziness",
-    "fever",
-    "ant. chest pain",
-    "open wound",
-    "headache",
-    "epigastric pain",
-    "mental change",
-    "general weakness",
-    "pain, chest",
-    "vomiting",
-    "hematemesis",
-    "vaginal bleeding",
-    "left chest pain",
-    "lt flank pain",
-    "syncope",
-    "dysarthria"
-    ]
+    # lista completa sem redundância textual
+    try:
+        resposta_sintomas = requests.get("http://127.0.0.1:8000/sintomas")
 
-    queixa = st.selectbox("Queixa principal", queixas_modelo)
+        if resposta_sintomas.status_code == 200:
+            queixas_modelo = resposta_sintomas.json()
+        else:
+            queixas_modelo = sorted(list(TODOS_SINTOMAS))
+
+    except:
+        queixas_modelo = sorted(list(TODOS_SINTOMAS))
+
+    # selectbox do streamlit já tem busca automática
+    queixa = st.selectbox(
+        "Queixa principal",
+        queixas_modelo,
+        accept_new_options=True
+    )
 
     sbp = st.number_input("Pressão Sistólica (SBP)", min_value=50, max_value=250, value=120)
     dbp = st.number_input("Pressão Diastólica (DBP)", min_value=30, max_value=150, value=80)
@@ -66,7 +62,7 @@ if pagina == "Triagem":
                 "cpf": cpf,
                 "Sex": sexo,
                 "Age_Group": idade,
-                "Chief_complain_Grouped": queixa,
+                "Chief_complain": queixa,
                 "SBP": sbp,
                 "DBP": dbp,
                 "HR": hr,
@@ -112,6 +108,77 @@ elif pagina == "Correção Médica":
         "Classificação real",
         [1, 2, 3, 4, 5]
     )
+
+    grupos_semanticos = [
+        "Sintomas Neurologicos Agudos",
+        "Dor Toracica/Cardiovascular",
+        "Sintomas Respiratorios",
+        "Sintomas Gastrointestinais",
+        "Trauma",
+        "Hemorragia",
+        "Sintomas Infecciosos",
+        "Sintomas Urologicos",
+        "Sintomas Psiquiatricos",
+        "Sintomas Dermatologicos",
+        "Outros Clinicos"
+    ]
+
+    if cpf_correcao and len(cpf_correcao) == 11 and cpf_correcao.isdigit():
+
+        try:
+            resposta_dados = requests.get("http://127.0.0.1:8000/dados")
+
+            if resposta_dados.status_code == 200:
+
+                import pandas as pd
+                df_dados = pd.DataFrame(resposta_dados.json())
+
+                if not df_dados.empty:
+
+                    df_paciente = df_dados[df_dados["cpf"] == cpf_correcao]
+
+                    if not df_paciente.empty:
+
+                        ultimo = df_paciente.iloc[-1]
+
+                        if bool(ultimo.get("sintoma_desconhecido", False)):
+
+                            entrada = ultimo["entrada"]
+
+                            sintoma = entrada.get("Chief_complain", "Não informado")
+                            grupo_atual = entrada.get("Semantic_Group", "Outros Clinicos")
+
+                            st.warning("Sintoma não listado detectado. Revise o grupo semântico caso a sugestão esteja incorreta.")
+
+                            st.info(f"Sintoma digitado: {sintoma}")
+                            st.info(f"Grupo sugerido pelo sistema: {grupo_atual}")
+
+                            novo_grupo = st.selectbox(
+                                "Grupo semântico correto",
+                                grupos_semanticos,
+                                index=grupos_semanticos.index(grupo_atual)
+                                if grupo_atual in grupos_semanticos else 10
+                            )
+
+                            if st.button("Salvar correção do grupo semântico"):
+
+                                resposta_grupo = requests.post(
+                                    "http://127.0.0.1:8000/corrigir_grupo",
+                                    json={
+                                        "cpf": cpf_correcao,
+                                        "grupo_semantico": novo_grupo
+                                    }
+                                )
+
+                                resultado_grupo = resposta_grupo.json()
+
+                                if "erro" in resultado_grupo:
+                                    st.error(resultado_grupo["erro"])
+                                else:
+                                    st.success("Grupo semântico atualizado com sucesso!")
+
+        except:
+            st.warning("Não foi possível carregar os dados do paciente para curadoria.")
 
     if st.button("Salvar correção"):
 
@@ -272,7 +339,7 @@ elif pagina == "Dashboard":
   
                     st.subheader("Análise por tipo de caso")
 
-                    queixas = df_corrigidos["entrada"].apply(lambda x: x.get("Chief_complain_Grouped", "OUTROS"))
+                    queixas = df_corrigidos["entrada"].apply(lambda x: x.get("Chief_complain", "OUTROS"))
 
                     df_corrigidos["queixa"] = queixas
 
